@@ -1,0 +1,510 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+/**
+ * @author MengBao
+ * 未经允许，禁止转载。
+ */
+int studentCount;       //学生总数
+int hasQuaStuCount = 0; //有资格的人数
+int shcStuCount = 0;    //校级优秀学生理论人数
+int shcStuCount1 = 0;   //校级优秀学生实际人数(考虑到并列)
+int geneR, pubR, majR;  //通选，公共，专业课无资格人数
+
+//全部学生信息(获取的stuA，有资格的排序后的stuAOrder)
+//临时储存同一专业学生信息(获取的stuM，有资格的排序后stuMOrder)
+struct studentAll
+{
+    int stuNumber;
+    char name[10];
+    int major, geneS1, geneS2, geneS3, pubS1, pubS2, pubS3, majS1, majS2, qualification;
+    float score, geneS, pubS, majS;
+} stuA[5000], stuAOrder[5000], stuM[5000], stuMOrder[5000], t;
+
+void main()
+{
+    int choose;
+    //声明函数
+    void read();
+    void sumGeneS();
+    void sumPubS();
+    void sumMajS();
+    void score();
+    void qual();
+    void sort(char, int, int); //类型(s=school,m=major),专业人数，专业代号
+    void printSchScore();
+    void printMajScore();
+    void printMajNum(int);
+    void printUnSchStuMajInform();
+    void printSchNumMaxMaj();
+    void printUnMaj(int);
+    void check();
+    void analyse();
+    void write();
+    //调用函数
+    read();          //初始化stuA
+    sumGeneS();      //计算通识总分
+    sumPubS();       //计算公共总分
+    sumMajS();       //计算专业总分
+    score();         //计算总评定成绩
+    sort('s', 0, 0); //对全体学生有资格的按评定成绩由高到低排序
+    qual();          //判断优秀类型(0-不优秀,1-校级且专业优秀,2-专业优秀,3-校级优秀)
+    write();         //校级写入r2，专业写入r3
+    do
+    {
+        printf("请选择...\n0-结束程序\n1-打印校级优秀学生的评定成绩\n2-打印各个专业的专业优秀学生评优成绩\n3-打印各个专业校级优秀学生人数\n4-打印没有校级优秀学生的专业信息\n5-打印校级优秀学生人数最多的专业\n6-打印各个专业不具有评优资格的人数\n7-打印不具备评优资格人数最多的专业\n8-打印各个专业优秀学生的人数\n9-打印各个专业优秀学生的信息\n10-查询本人评优结果\n11-分析不具备校级优秀评选资格的各因素所占的比重以及最主要原因\n\n");
+        scanf("%d", choose);
+        switch (choose)
+        {
+        case 0:
+            break;
+        case 1:
+            printSchScore();
+            break;
+        case 2:
+            printMajScore();
+            break;
+        case 3:
+            printMajNum(3);
+            break;
+        case 4:
+            printUnSchStuMajInform();
+            break;
+        case 5:
+            printSchNumMaxMaj();
+            break;
+        case 6:
+            printUnMaj(6);
+            break;
+        case 7:
+            printUnMaj(7);
+            break;
+        case 8:
+        case 9:
+            printMajNum(8);
+            break;
+        case 10:
+            check();
+            break;
+        case 11:
+            analyse();
+            break;
+        default:
+            printf("\n未知选项");
+        }
+    } while (choose);
+}
+
+//初始化结构体stuA
+void read()
+{
+    FILE *fp;
+    fp = fopen("f1.txt", "r");
+    if (fp == NULL)
+    {
+        printf("\n无法打开文件\n");
+        exit(0);
+    }
+    for (int i = 0; i <= 5000; i++)
+    {
+        fscanf(fp, "%d%s%d%d%d%d%d%d%d%d%d", &stuA[i].stuNumber, stuA[i].name, &stuA[i].major, &stuA[i].geneS1, &stuA[i].geneS2, &stuA[i].geneS3, &stuA[i].pubS1, &stuA[i].pubS2, &stuA[i].pubS3, &stuA[i].majS1, &stuA[i].majS2);
+        if (!feof(fp)) //判断是否读取完
+            studentCount++;
+    }
+    fclose(fp);
+}
+
+//计算通识总分geneS
+void sumGeneS()
+{
+    for (int i = 0; i < studentCount; i++)
+        stuA[i].geneS = stuA[i].geneS1 + stuA[i].geneS2 + stuA[i].geneS3;
+}
+
+//计算公共总分pubS
+void sumPubS()
+{
+    for (int i = 0; i < studentCount; i++)
+        stuA[i].pubS = stuA[i].pubS1 + stuA[i].pubS2 + stuA[i].pubS3;
+}
+
+//计算专业总分majS
+void sumMajS()
+{
+    for (int i = 0; i < studentCount; i++)
+        stuA[i].majS = stuA[i].majS1 + stuA[i].majS2;
+}
+
+//计算学生的评定成绩score
+void score()
+{
+    for (int i = 0; i < studentCount; i++)
+        stuA[i].score = stuA[i].pubS * 0.8 + stuA[i].majS * 1.2;
+}
+
+//判断是否有评优资格(通>=60&&公共>=70&&专业>=80)
+int hasQua(int geneS1, int geneS2, int geneS3, int pubS1, int pubS2, int pubS3, int majS1, int majS2)
+{
+    if (geneS1 < 60 || geneS2 < 60 || geneS3 < 60 || pubS1 < 70 || pubS2 < 70 || pubS3 < 70 || majS1 < 80 || majS2 < 80)
+        return 0; //否
+    return 1;     //是
+}
+
+//对有资格的按评定成绩从高到低排序，对象为type,校级在main调用,缓存到xxOrder
+void sort(char type, int majorStuNumber, int major)
+{
+    if (type == 's' && !majorStuNumber)
+    {
+        for (int i = 0; i < studentCount; i++)
+            if (hasQua(stuA[i].geneS1, stuA[i].geneS2, stuA[i].geneS3, stuA[i].pubS1, stuA[i].pubS2, stuA[i].pubS3, stuA[i].majS1, stuA[i].majS2))
+            {
+                stuAOrder[hasQuaStuCount] = stuA[i];
+                hasQuaStuCount++;
+            }
+        for (int i = 0; i < studentCount - 1; i++)
+            for (int j = i + 1; j < studentCount; j++)
+                if (stuAOrder[j].score > stuAOrder[i].score)
+                {
+                    t = stuAOrder[j];
+                    stuAOrder[j] = stuAOrder[i];
+                    stuAOrder[i] = t;
+                }
+    }
+    else if (type == 'm')
+    {
+        void majorSame(int);
+        majorSame(major);
+        for (int i = 0, j = 0; i < majorStuNumber; i++)
+            if (hasQua(stuM[i].geneS1, stuM[i].geneS2, stuM[i].geneS3, stuM[i].pubS1, stuM[i].pubS2, stuM[i].pubS3, stuM[i].majS1, stuM[i].majS2))
+            {
+                stuMOrder[j] = stuM[i];
+                j++;
+            }
+        for (int i = 0; i < majorStuNumber - 1; i++)
+            for (int j = i + 1; j < majorStuNumber; j++)
+                if (stuMOrder[j].score > stuMOrder[i].score)
+                {
+                    t = stuMOrder[i];
+                    stuMOrder[i] = stuMOrder[j];
+                    stuMOrder[j] = t;
+                }
+    }
+}
+
+//判断是否为校级优秀学生(全校前5%)
+int isScLevel(float score)
+{ //学生有studentCount位,理应有shcStuCount为优秀，小数四舍五入
+    int stuScLevelNum0;
+    stuScLevelNum0 = (5 * studentCount) % 100; //小数部分
+    shcStuCount = (5 * studentCount) / 100;    //整数部分
+    if (stuScLevelNum0 >= 50)
+        shcStuCount++; //五入
+    //最低成绩minScore
+    float minScore;
+    minScore = stuAOrder[shcStuCount].score;
+    //考虑到有并列情况,适当扩大
+    shcStuCount1 = shcStuCount + 100;
+    // printf
+    if (score >= minScore)
+        return 1; //是
+    return 0;     //否
+}
+
+//判断是否为major专业优秀学生(专业前10%)
+int isMaLevel(int major, float score)
+{ //学生有majorStuNumber位,理应有stuMaLevelNum为优秀，小数四舍五入
+    int majorSort(int);
+    void sort(char, int, int);
+    int majorStuNumber; //专业学生人数
+    majorStuNumber = majorSort(major);
+    sort('m', majorStuNumber, major);
+    int stuMaLevelNum0, stuMaLevelNum;
+    stuMaLevelNum0 = (10 * majorStuNumber) % 100; //小数部分
+    stuMaLevelNum = (10 * majorStuNumber) / 100;  //整数部分
+    if (stuMaLevelNum0 >= 50)
+        stuMaLevelNum++; //五入
+    float minScore;
+    minScore = stuMOrder[stuMaLevelNum].score;
+    if (score >= minScore)
+        return 1;
+    return 0;
+}
+
+//判断优秀类型
+void qual()
+{
+    for (int i = 0; i < studentCount; i++)
+    {
+        if (!hasQua(stuA[i].geneS1, stuA[i].geneS2, stuA[i].geneS3, stuA[i].pubS1, stuA[i].pubS2, stuA[i].pubS3, stuA[i].majS1, stuA[i].majS2))
+            stuA[i].qualification = 0; //无资格
+        else
+        {
+            if (isScLevel(stuA[i].score) && isMaLevel(stuA[i].major, stuA[i].score))
+                stuA[i].qualification = 1; //校级优秀且专业优秀
+            else if (isMaLevel(stuA[i].major, stuA[i].score))
+                stuA[i].qualification = 2; //专业优秀
+            else if (isScLevel(stuA[i].score))
+                stuA[i].qualification = 3; //校级优秀
+            else if (!isScLevel(stuA[i].score) && !isMaLevel(stuA[i].major, stuA[i].score))
+                stuA[i].qualification = 4; //未评上
+        }
+        for (int j = 0; j < hasQuaStuCount; j++)
+            if (stuAOrder[j].stuNumber == stuA[i].stuNumber)
+                stuAOrder[j].qualification = stuA[i].qualification;
+    }
+}
+
+//选出同一专业学生并缓存到stuM
+void majorSame(int major)
+{
+    for (int i = 0, j = 0; i < studentCount; i++)
+        if (stuA[i].major == major)
+        {
+            stuM[j] = stuA[i];
+            j++;
+        }
+}
+
+//返回专业学生数量
+int majorSort(int major)
+{
+    int j = 0;
+    for (int i = 0; i < studentCount; i++)
+        if (stuA[i].major == major)
+            j++;
+    return j;
+}
+
+//打印校级优秀学生的评定成绩
+void printSchScore()
+{
+    for (int i = 0; i < shcStuCount; i++)
+        if (stuAOrder[i].qualification == 1 || stuAOrder[i].qualification == 3)
+            printf("校级优秀学生%s的评定成绩为%f\n", stuAOrder[i].name, stuAOrder[i].score);
+}
+
+//打印各个专业的专业优秀学生评优成绩
+void printMajScore()
+{
+    for (int i = 0; i <= 50; i++)
+        if (majorSort(i))
+            for (int j = 0; j < majorSort(i); j++)
+            {
+                int major = i;
+                sort('m', majorSort(major), major);
+                if (stuMOrder[j].qualification == 1 || stuMOrder[j].qualification == 2)
+                    printf("%d专业的专业优秀学生%s的评优成绩是%f\n", stuMOrder[j].major, stuMOrder[j].name, stuMOrder[j].score);
+            }
+}
+
+//打印各个专业(校级\ )优秀学生人数(及信息)(3\8)
+void printMajNum(int num)
+{
+
+    for (int i = 0; i <= 50; i++)
+    {
+        int shcnum = 0, majnum = 0;
+        if (majorSort(i))
+            if (num == 3)
+            {
+                for (int j = 0; j < majorSort(i); j++)
+                {
+                    int major = i;
+                    sort('m', majorSort(major), major);
+                    if (stuMOrder[j].qualification == 1 || stuMOrder[j].qualification == 3)
+                        shcnum++;
+                    if (stuMOrder[j].qualification == 2)
+                        majnum++;
+                }
+                printf("%d专业的校级优秀学生有%d人\n", i, majnum);
+            }
+            else if (num == 8)
+            {
+                for (int j = 0; j < majorSort(i); j++)
+                {
+                    int major = i;
+                    sort('m', majorSort(major), major);
+                    if (stuMOrder[j].qualification == 1 || stuMOrder[j].qualification == 2 || stuMOrder[j].qualification == 3)
+                    {
+                        printf("姓名:%s，评定成绩:%f\n", stuMOrder[j].name, stuMOrder[j].score);
+                        majnum++;
+                    }
+                }
+                printf("以上为专业%02d的优秀学生，共有%d人\n\n", i, majnum);
+            }
+    }
+}
+
+//打印没有校级优秀学生的专业信息
+void printUnSchStuMajInform()
+{
+    printf("没有校级优秀的学生的专业信息:\n");
+    for (int i = 0; i < studentCount; i++)
+        if (stuA[i].qualification == 2 || stuA[i].qualification == 4 || stuA[i].qualification == 0)
+            printf("姓名:%s,专业:%02d\n", stuA[i].name, stuA[i].major);
+}
+
+//打印校级优秀学生人数最多的专业
+void printSchNumMaxMaj()
+{
+    int maxmajor, sum[51], max = 0;
+    for (int major = 1; major <= 50; major++)
+    {
+        sum[major] = 0;
+        if (majorSort(major))
+        {
+            majorSame(major);
+            for (int i = 0; i < majorSort(major); i++)
+                if (stuM[i].qualification == 1 || stuM[i].qualification == 3)
+                    sum[major]++;
+        }
+    }
+    for (int i = 1; i <= 50; i++)
+        if (sum[i] > max)
+        {
+            max = sum[i];
+            maxmajor = i;
+        }
+    printf("校级优秀学生最多的专业是专业%02d，有%d位", maxmajor, max);
+}
+
+//打印各个专业不具有评优资格的人数6
+//打印不具备评优资格人数最多的专业7
+void printUnMaj(int num)
+{
+    int maxmajor, sum[51], max = 0;
+    for (int major = 1; major <= 50; major++)
+    {
+        sum[major] = 0;
+        if (majorSort(major))
+        {
+            majorSame(major);
+            for (int i = 0; i < majorSort(major); i++)
+                if (stuM[i].qualification == 0)
+                    sum[major]++;
+        }
+    }
+
+    if (num == 6)
+    {
+        for (int i = 1; i <= 50; i++)
+            if (majorSort(i))
+                printf("专业%02d，有%d位不具有评优资格\n", i, sum[i]);
+    }
+    else if (num == 7)
+    {
+        for (int i = 1; i <= 50; i++)
+            if (sum[i] > max)
+            {
+                max = sum[i];
+                maxmajor = i;
+            }
+        printf("不具备评优资格人数最多的专业是专业%02d，有%d位\n", maxmajor, max);
+    }
+}
+
+//查询
+void check()
+{
+    char name[10];
+    int stuNumber;
+    stuNumber = -1;
+    name[0] = '1';
+    printf("请输入姓名及对应的学号(左侧不用输入0)来查询评优结果,输入格式:姓名<空格>学号\n");
+    scanf("%s%d", name, &stuNumber);
+    if (stuNumber == -1 || name[0] == '1')
+        printf("缺少姓名或学号，禁止查询。");
+    else
+        for (int i = 0; i < studentCount; i++)
+            if (stuNumber == stuA[i].stuNumber)
+                for (int j = 0; j < 10; j++)
+                    if (name[j] != stuA[i].name[j])
+                    {
+                        printf("姓名与学号不匹配，查询失败。");
+                        break;
+                    }
+                    else
+                    {
+                        printf("您的评优结果是:%d\n(0-没有评优资格,1-校级且专业优秀学生,2-专业优秀学生,3-校级优秀学生,4-普通学生\n", stuA[i].qualification);
+                        break;
+                    }
+}
+
+//对不具备评优资格的原因分类累加
+void unQuaSort()
+{
+    for (int i = 0; i < studentCount; i++)
+    {
+        if (stuA[i].geneS1 < 60 || stuA[i].geneS2 < 60 || stuA[i].geneS3 < 60)
+            geneR++;
+        else if (stuA[i].pubS1 < 70 || stuA[i].pubS2 < 70 || stuA[i].pubS3 < 70)
+            pubR++;
+        else if (stuA[i].majS1 < 80 || stuA[i].majS2 < 80)
+            majR++;
+    }
+}
+
+//分析不具备校级优秀评选资格的各因素所占的比重以及最主要原因
+void analyse()
+{
+    void unQuaSort();
+    unQuaSort();
+    float sumR = geneR + pubR + majR, geneAccount, pubAccount, majAccount, max;
+    int mainR = 1; //默认为通识
+    geneAccount = 100 * geneR / sumR;
+    pubAccount = 100 * pubR / sumR;
+    majAccount = 100 * majR / sumR;
+    max = geneAccount;
+    if (pubAccount > max)
+    {
+        mainR = 2;
+        max = pubAccount;
+    } //公共
+    if (majAccount > max)
+    {
+        mainR = 3;
+        max = majAccount;
+    } //专业
+    printf("通识教育课因素占比:%3.1f%\n公共基础课因素占比:%3.1f%\n专业课占比:%3.1f%\n不具备校级优秀评选资格的最主要因素是%d\n(1-通识教育课不及格，2-公共基础课低于70分，3-专业课低于80分)", geneAccount, pubAccount, majAccount, mainR);
+}
+
+//校级写入r2，专业写入r3
+void write()
+{
+    //写入r2
+    FILE *fp1;
+    fp1 = fopen("f2.txt", "w");
+    if (fp1 == NULL)
+    {
+        printf("\n无法打开文件\n");
+        exit(0);
+    }
+    for (int i = 0; i < 5000; i++)
+        if (stuAOrder[i].qualification == 1 || stuAOrder[i].qualification == 3)
+            fprintf(fp1, "%05d %s %02d %3d %3d %3d %3d %3d %3d %3d %3d %f\n", stuAOrder[i].stuNumber, stuAOrder[i].name, stuAOrder[i].major, stuAOrder[i].geneS1, stuAOrder[i].geneS2, stuAOrder[i].geneS3, stuAOrder[i].pubS1, stuAOrder[i].pubS2, stuAOrder[i].pubS3, stuAOrder[i].majS1, stuAOrder[i].majS2, stuAOrder[i].score);
+    fclose(fp1);
+    //写入r3
+    int majStuNumber;
+    int majorSort(int);
+    FILE *fp2;
+    fp2 = fopen("f3.txt", "w");
+    if (fp2 == NULL)
+    {
+        printf("\n无法打开文件\n");
+        exit(0);
+    }
+    for (int j = 0; j <= 50; j++)
+    {
+        int major;
+        majStuNumber = majorSort(j);
+        if (majStuNumber)
+        {
+            major = j;
+            sort('m', majStuNumber, major);
+            for (int i = 0; i < 5000; i++)
+                if (stuMOrder[i].qualification == 1 || stuMOrder[i].qualification == 2)
+                    fprintf(fp2, "%05d %s %02d %3d %3d %3d %3d %3d %3d %3d %3d %f\n", stuMOrder[i].stuNumber, stuMOrder[i].name, stuMOrder[i].major, stuMOrder[i].geneS1, stuMOrder[i].geneS2, stuMOrder[i].geneS3, stuMOrder[i].pubS1, stuMOrder[i].pubS2, stuMOrder[i].pubS3, stuMOrder[i].majS1, stuMOrder[i].majS2, stuMOrder[i].score);
+        }
+    }
+    fclose(fp2);
+}
